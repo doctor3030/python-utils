@@ -1,11 +1,11 @@
 from setuptools import setup, find_packages
 import pathlib
 
-# The directory containing this file
-ROOOT = pathlib.Path(__file__).parent
-
-# The text of the README file
-README = (ROOOT / "README.md").read_text()
+# # The directory containing this file
+# ROOOT = pathlib.Path(__file__).parent
+#
+# # The text of the README file
+# README = (ROOOT / "README.md").read_text()
 
 setup(
     name='python-utils',
