@@ -52,7 +52,10 @@ class AsyncCommands:
     def close(self, wait_term: int = None):
         for proc in self.procs:
             if proc.proc.returncode is None:
-                return_code = self.loop.run_until_complete(AsyncCommands.proc_terminate(proc.proc, wait_term))
+                if self.loop.is_running():
+                    return_code = self.loop.create_task(AsyncCommands.proc_terminate(proc.proc, wait_term))
+                else:
+                    return_code = self.loop.run_until_complete(AsyncCommands.proc_terminate(proc.proc, wait_term))
             else:
                 return_code = proc.proc.returncode
             self.logger.info('Process PID: {pid} exited with code {code}'.format(pid=proc.proc.pid, code=return_code))
@@ -125,7 +128,10 @@ class AsyncCommands:
         for tasks_in_batch in coros_batch:
             self.logger.debug("Beginning work on chunk %s/%s" % (batch, num_batches))
             commands = asyncio.gather(*tasks_in_batch)
-            results = self.loop.run_until_complete(commands)
+            if self.loop.is_running():
+                results = self.loop.create_task(commands)
+            else:
+                results = self.loop.run_until_complete(commands)
             all_results += results
             self.logger.info("Completed work on chunk %s/%s" % (batch, num_batches))
             batch += 1
