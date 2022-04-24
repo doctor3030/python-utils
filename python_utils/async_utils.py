@@ -40,7 +40,8 @@ class AsyncCommands:
             self.loop = asyncio.get_event_loop()
 
     def __del__(self):
-        self.loop.close()
+        if not self.loop.is_running():
+            self.loop.close()
 
     @staticmethod
     async def proc_terminate(proc: asyncio.subprocess.Process, wait_sec: int = None):
