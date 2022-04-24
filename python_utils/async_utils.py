@@ -6,7 +6,6 @@ from asyncio.streams import StreamReader
 # from collections import namedtuple
 import logging
 
-
 # class ILogger:
 #     debug: Callable
 #     info: Callable
@@ -35,7 +34,10 @@ class AsyncCommands:
             asyncio.set_event_loop(asyncio.new_event_loop())
         # if platform.system() == "Windows":
         #     asyncio.set_event_loop(asyncio.ProactorEventLoop())
-        self.loop = asyncio.get_event_loop()
+        try:
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.loop = asyncio.get_event_loop()
 
     def __del__(self):
         self.loop.close()

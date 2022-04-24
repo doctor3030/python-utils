@@ -1,3 +1,6 @@
+import sys
+sys.path.append('../')
+
 import time
 import signal
 from python_utils.graceful_killer import GracefulKiller, KillMethods

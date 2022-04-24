@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../')
 from python_utils.async_utils import AsyncCommands, Command
 # import logging
 from loguru_logger_lite import Logger
