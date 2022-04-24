@@ -127,12 +127,15 @@ class AsyncCommands:
         batch = 1
         for tasks_in_batch in coros_batch:
             self.logger.debug("Beginning work on chunk %s/%s" % (batch, num_batches))
-            commands = asyncio.gather(*tasks_in_batch)
+            # commands = asyncio.gather(*tasks_in_batch)
             if self.loop.is_running():
-                results = self.loop.create_task(commands)
+                for task in tasks_in_batch:
+                    results = self.loop.create_task(task)
+                    all_results += results
             else:
+                commands = asyncio.gather(*tasks_in_batch)
                 results = self.loop.run_until_complete(commands)
-            all_results += results
+                all_results += results
             self.logger.info("Completed work on chunk %s/%s" % (batch, num_batches))
             batch += 1
 
