@@ -16,10 +16,12 @@ except ImportError:
 
 logging.getLogger(__name__).addHandler(NullHandler())
 
-from python_utils.shell_utils import AsyncCommands, Command, SubprocessAsync, OutputCallback
+from python_utils.shell_utils import AsyncCommands, Command, SubprocessAsync, OutputCallback, \
+    SyncCommands, SubprocessSync
 from python_utils.graceful_killer import GracefulKiller, KillMethods
 
 __all__ = [
     'AsyncCommands', 'Command', 'SubprocessAsync', 'OutputCallback',
+    'SyncCommands', 'SubprocessSync',
     'GracefulKiller', 'KillMethods'
 ]

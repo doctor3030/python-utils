@@ -9,7 +9,7 @@ import pathlib
 
 setup(
     name='python-utils',
-    version='0.0.10',
+    version='0.0.11',
     url='https://github.com/doctor3030/python-utils',
     license='MIT',
     author='Dmitry Amanov',
