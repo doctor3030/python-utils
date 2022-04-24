@@ -54,7 +54,7 @@ class AsyncCommands:
         for proc in self.procs:
             if proc.proc.returncode is None:
                 if self.loop.is_running():
-                    return_code = asyncio.ensure_future(AsyncCommands.proc_terminate(proc.proc, wait_term))
+                    return_code = self.loop.create_task(AsyncCommands.proc_terminate(proc.proc, wait_term))
                 else:
                     return_code = self.loop.run_until_complete(AsyncCommands.proc_terminate(proc.proc, wait_term))
             else:
@@ -131,7 +131,7 @@ class AsyncCommands:
             # commands = asyncio.gather(*tasks_in_batch)
             if self.loop.is_running():
                 for task in tasks_in_batch:
-                    results = asyncio.ensure_future(task)
+                    results = self.loop.create_task(asyncio.ensure_future(task))
                     # all_results += results
             else:
                 commands = asyncio.gather(*tasks_in_batch)
