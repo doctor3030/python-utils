@@ -115,7 +115,7 @@ class AsyncCommands:
         return await proc.communicate()
 
     def run_coros(self, tasks: List[Coroutine[Any, Any, Tuple[bytes, bytes]]], max_concurrent_tasks: int = 0):
-        all_results = []
+        # all_results = []
 
         if max_concurrent_tasks == 0:
             coros_batch = [tasks]
@@ -131,15 +131,15 @@ class AsyncCommands:
             if self.loop.is_running():
                 for task in tasks_in_batch:
                     results = self.loop.create_task(task)
-                    all_results += results
+                    # all_results += results
             else:
                 commands = asyncio.gather(*tasks_in_batch)
                 results = self.loop.run_until_complete(commands)
-                all_results += results
+                # all_results += results
             self.logger.info("Completed work on chunk %s/%s" % (batch, num_batches))
             batch += 1
 
-        return all_results
+        return 1
 
     def _run_async_shell_commands(
             self,
