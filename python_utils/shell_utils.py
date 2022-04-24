@@ -1,22 +1,156 @@
-# import platform
 import asyncio
 import time
-from typing import List, Callable, Coroutine, Any, Tuple, NamedTuple
+from typing import List, Callable, Coroutine, Any, Tuple, NamedTuple, IO
 from asyncio.streams import StreamReader
-# from collections import namedtuple
+import subprocess
+import threading
 import logging
-
-# class ILogger:
-#     debug: Callable
-#     info: Callable
-#     warning: Callable
-#     error: Callable
-#     critical: Callable
 
 
 Command = NamedTuple('Command', [('command', str), ('name', str)])
-Subprocess = NamedTuple('Subprocess', [('proc', asyncio.subprocess.Process), ('name', str)])
+SubprocessAsync = NamedTuple('SubprocessAsync', [('proc', asyncio.subprocess.Process), ('name', str)])
+SubprocessSync = NamedTuple('SubprocessSync', [('proc', subprocess.Popen), ('name', str)])
 OutputCallback = Callable[[bytes, str, str], None]
+
+
+class SyncCommands:
+
+    def __init__(self, logger: logging.Logger = None):
+        if logger:
+            self.logger = logger
+        else:
+            logging.basicConfig(level=logging.INFO)
+            self.logger = logging.getLogger()
+
+        self.procs: List[SubprocessSync] = []
+
+    def __del__(self):
+        pass
+
+    def close(self):
+        for proc in self.procs:
+            _proc = proc.proc
+            if _proc.returncode is None:
+                _proc.terminate()
+                while True:
+                    proc.proc.poll()
+                    if _proc.returncode is not None:
+                        self.logger.info('Process PID: {pid} exited with code {code}'
+                                         .format(pid=_proc.pid, code=_proc.returncode))
+                        break
+            else:
+                self.logger.info('Process PID: {pid} exited with code {code}'
+                                 .format(pid=_proc.pid, code=_proc.returncode))
+
+    @staticmethod
+    def get_n_batches(data_size: int, batch_size: int) -> int:
+        return data_size // batch_size + (
+            0 if data_size % batch_size == 0 else 1)
+
+    @staticmethod
+    def generate_commands_batches(commands: List[Command], batch_size: int):
+        for i in range(0, len(commands), batch_size):
+            yield commands[i: i + batch_size]
+
+    @staticmethod
+    def read_stream(stream: IO, cb: Callable[[bytes, str, str], None], pid: str, name: str = None):
+        if not name or len(name) == 0:
+            name = 'sub-process'
+        while True:
+            line = stream.readline()
+            if line and len(line.strip()) > 0:
+                cb(line, pid, name)
+            else:
+                break
+
+    def _run_shell_subprocess(
+            self,
+            command: Command,
+            stdout_cb: OutputCallback = None,
+            stderr_cb: OutputCallback = None
+    ) -> subprocess.Popen:
+
+        if not command.name or len(command.name) == 0:
+            command_name = 'sub-process'
+        else:
+            command_name = command.name
+
+        # Create subprocess
+        proc = subprocess.Popen(command.command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        # Add to procs pool
+        self.procs.append(SubprocessSync(proc, command_name))
+
+        proc_out = threading.Thread(target=SyncCommands.read_stream,
+                                    args=(proc.stdout, stdout_cb, proc.pid, command_name))
+        proc_out.daemon = True
+        proc_out.start()
+        proc_err = threading.Thread(target=SyncCommands.read_stream,
+                                    args=(proc.stderr, stderr_cb, proc.pid, command_name))
+        proc_err.daemon = True
+        proc_err.start()
+
+        return proc
+
+    def _run_shell_commands(
+            self,
+            commands: List[Command],
+            max_concurrent_tasks: int,
+            cb_stdout: OutputCallback,
+            cb_stderr: OutputCallback
+    ):
+        if max_concurrent_tasks == 0:
+            commands_batch = [commands]
+            num_batches = len(commands_batch)
+        else:
+            commands_batch = SyncCommands.generate_commands_batches(commands=commands, batch_size=max_concurrent_tasks)
+            num_batches = AsyncCommands.get_n_batches(len(commands), max_concurrent_tasks)
+
+        batch = 1
+        for commands_in_batch in commands_batch:
+            self.logger.debug("Beginning work on chunk %s/%s" % (batch, num_batches))
+
+            procs: List[subprocess.Popen] = []
+            for command in commands_in_batch:
+                procs.append(self._run_shell_subprocess(command,
+                                                        stdout_cb=cb_stdout,
+                                                        stderr_cb=cb_stderr
+                                                        ))
+
+            while True:
+                # check if all sub-processes are finished
+                to_stop = True
+                for proc in procs:
+                    proc.poll()
+                    if proc.returncode is None:
+                        to_stop = False
+                if to_stop:
+                    break
+
+            self.logger.info("Completed work on chunk %s/%s" % (batch, num_batches))
+            batch += 1
+
+        return 1
+
+    @staticmethod
+    def run_shell_commands(
+            commands: List[Command],
+            max_concurrent_tasks: int,
+            cb_stdout: OutputCallback,
+            cb_stderr: OutputCallback,
+            logger: logging.Logger = None
+    ):
+        cls = SyncCommands(logger)
+
+        try:
+            return cls._run_shell_commands(
+                commands,
+                max_concurrent_tasks,
+                cb_stdout,
+                cb_stderr
+            )
+        except KeyboardInterrupt:
+            cls.close()
 
 
 class AsyncCommands:
@@ -28,7 +162,7 @@ class AsyncCommands:
             logging.basicConfig(level=logging.INFO)
             self.logger = logging.getLogger()
 
-        self.procs: List[Subprocess] = []
+        self.procs: List[SubprocessAsync] = []
 
         if asyncio.get_event_loop().is_closed():
             asyncio.set_event_loop(asyncio.new_event_loop())
@@ -101,7 +235,7 @@ class AsyncCommands:
             command_name = command.name
 
         # Add to procs pool
-        self.procs.append(Subprocess(proc, command.name))
+        self.procs.append(SubprocessAsync(proc, command_name))
 
         # Create output readers
         readers = []

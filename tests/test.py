@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../')
-from python_utils.async_utils import AsyncCommands, Command
+from python_utils.shell_utils import AsyncCommands, Command, SyncCommands
 # import logging
 from loguru_logger_lite import Logger
 
@@ -32,5 +32,6 @@ def cb_stderr(stream: bytes, pid: str, name: str):
     ))
 
 
-AsyncCommands.run_async_shell_commands(commands, 0, cb_stdout, cb_stderr, logger=logger, wait_term=3)
+# AsyncCommands.run_async_shell_commands(commands, 0, cb_stdout, cb_stderr, logger=logger, wait_term=3)
+SyncCommands.run_shell_commands(commands, 0, cb_stdout, cb_stderr, logger=logger)
 # print(_)
