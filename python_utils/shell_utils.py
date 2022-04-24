@@ -99,38 +99,43 @@ class SyncCommands:
             cb_stdout: OutputCallback,
             cb_stderr: OutputCallback
     ):
-        if max_concurrent_tasks == 0:
-            commands_batch = [commands]
-            num_batches = len(commands_batch)
-        else:
-            commands_batch = SyncCommands.generate_commands_batches(commands=commands, batch_size=max_concurrent_tasks)
-            num_batches = AsyncCommands.get_n_batches(len(commands), max_concurrent_tasks)
+        try:
+            if max_concurrent_tasks == 0:
+                commands_batch = [commands]
+                num_batches = len(commands_batch)
+            else:
+                commands_batch = SyncCommands.generate_commands_batches(commands=commands, batch_size=max_concurrent_tasks)
+                num_batches = AsyncCommands.get_n_batches(len(commands), max_concurrent_tasks)
 
-        batch = 1
-        for commands_in_batch in commands_batch:
-            self.logger.debug("Beginning work on chunk %s/%s" % (batch, num_batches))
+            batch = 1
+            for commands_in_batch in commands_batch:
+                self.logger.debug("Beginning work on chunk %s/%s" % (batch, num_batches))
 
-            procs: List[subprocess.Popen] = []
-            for command in commands_in_batch:
-                procs.append(self._run_shell_subprocess(command,
-                                                        stdout_cb=cb_stdout,
-                                                        stderr_cb=cb_stderr
-                                                        ))
+                procs: List[subprocess.Popen] = []
+                for command in commands_in_batch:
+                    procs.append(self._run_shell_subprocess(command,
+                                                            stdout_cb=cb_stdout,
+                                                            stderr_cb=cb_stderr
+                                                            ))
 
-            while True:
-                # check if all sub-processes are finished
-                to_stop = True
-                for proc in procs:
-                    proc.poll()
-                    if proc.returncode is None:
-                        to_stop = False
-                if to_stop:
-                    break
+                while True:
+                    # check if all sub-processes are finished
+                    to_stop = True
+                    for proc in procs:
+                        proc.poll()
+                        if proc.returncode is None:
+                            to_stop = False
+                    if to_stop:
+                        break
 
-            self.logger.info("Completed work on chunk %s/%s" % (batch, num_batches))
-            batch += 1
+                self.logger.info("Completed work on chunk %s/%s" % (batch, num_batches))
+                batch += 1
 
-        return 1
+            return 0
+
+        except Exception as e:
+            self.close()
+            return 2
 
     @staticmethod
     def run_shell_commands(
@@ -251,30 +256,34 @@ class AsyncCommands:
 
     def run_coros(self, tasks: List[Coroutine[Any, Any, Tuple[bytes, bytes]]], max_concurrent_tasks: int = 0):
         # all_results = []
-
-        if max_concurrent_tasks == 0:
-            coros_batch = [tasks]
-            num_batches = len(coros_batch)
-        else:
-            coros_batch = AsyncCommands.generate_coro_batches(tasks=tasks, chunk_size=max_concurrent_tasks)
-            num_batches = AsyncCommands.get_n_batches(len(tasks), max_concurrent_tasks)
-
-        batch = 1
-        for tasks_in_batch in coros_batch:
-            self.logger.debug("Beginning work on chunk %s/%s" % (batch, num_batches))
-            # commands = asyncio.gather(*tasks_in_batch)
-            if self.loop.is_running():
-                for task in tasks_in_batch:
-                    results = self.loop.create_task(task)
-                    # all_results += results
+        try:
+            if max_concurrent_tasks == 0:
+                coros_batch = [tasks]
+                num_batches = len(coros_batch)
             else:
-                commands = asyncio.gather(*tasks_in_batch)
-                results = self.loop.run_until_complete(commands)
-                # all_results += results
-            self.logger.info("Completed work on chunk %s/%s" % (batch, num_batches))
-            batch += 1
+                coros_batch = AsyncCommands.generate_coro_batches(tasks=tasks, chunk_size=max_concurrent_tasks)
+                num_batches = AsyncCommands.get_n_batches(len(tasks), max_concurrent_tasks)
 
-        return 1
+            batch = 1
+            for tasks_in_batch in coros_batch:
+                self.logger.debug("Beginning work on chunk %s/%s" % (batch, num_batches))
+                # commands = asyncio.gather(*tasks_in_batch)
+                if self.loop.is_running():
+                    for task in tasks_in_batch:
+                        results = self.loop.create_task(task)
+                        # all_results += results
+                else:
+                    commands = asyncio.gather(*tasks_in_batch)
+                    results = self.loop.run_until_complete(commands)
+                    # all_results += results
+                self.logger.info("Completed work on chunk %s/%s" % (batch, num_batches))
+                batch += 1
+
+            return 0
+
+        except Exception as e:
+            self.close()
+            return 2
 
     def _run_async_shell_commands(
             self,
