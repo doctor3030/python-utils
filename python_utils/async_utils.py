@@ -131,7 +131,7 @@ class AsyncCommands:
             # commands = asyncio.gather(*tasks_in_batch)
             if self.loop.is_running():
                 for task in tasks_in_batch:
-                    results = self.loop.create_task(asyncio.ensure_future(task))
+                    results = self.loop.create_task(task)
                     # all_results += results
             else:
                 commands = asyncio.gather(*tasks_in_batch)
